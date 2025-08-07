@@ -1,0 +1,3 @@
+python.exe -m pip install --upgrade pip
+pip install openai --upgrade
+pip install openai python-dotenv

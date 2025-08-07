@@ -12,6 +12,7 @@ mvn clean compile
 java -cp target/classes pl.darulec.Result
 ```
 
+# run gpt5
 ```
 using @/solver/workflow.txt  implement agentically @/docs/task.md  in @/src/main/java/pl/darulec/Result.java 
 ```

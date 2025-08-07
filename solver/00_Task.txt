@@ -1,0 +1,166 @@
+take a look at prompts below and reply with adjusted prompts and workflow so that I can implement whole task defined in task.md in one agentic go. Imagine that p1 is the only one that
+is executed via chatGPT gui - because I want the vision capability - but you still can optimize how this p1 prompt is written.
+then analyze from p2 to p8 and reply back with optimized flow, also under each prompt convince me why your version is better. at the end do an exercise in contrarian / negative thinking trying to challenge why and where your 
+workflow may not work so that I have starting point for my review and i can se your thinking issues that were not adressed or maybe require input from me
+
+
+
+
+p1 - means prompt one, and so on (p2 - prompt two)
+
+p1 - model to do it is gpt-40
+
+```properties
+P1: Image Analysis & Text Extraction
+"Analyze the provided coding task image and perform OCR to extract all technical text. List extracted code snippets, requirements, and constraints verbatim. Add meta-commentary about:
+1. Confidence percentage for each line (e.g., 95% certainty on keywords).
+2. Flag uncertain characters with [??] notation.
+3. Note any diagram elements that don't translate to text".
+4. answer as markdown snippet without much decoration like bold. if this is a snippet of a sourcecode do not render line numbers. if this is a text when bulletpoins are used or dashes as bulletpoints always fallback to numbers (1. 2. 3. ).
+5. the ocr should be exact to character, actual data you are only allowed to change decoration such as formatting
+```
+
+
+
+p2
+
+```properties
+P2: Surgical Goal Definition
+Convert text from docs/task.md into a hyper-specific implementation target using this template:
+'Develop [EXACT WHAT] that must [CRITICAL FUNCTION] within [TIMEBOX], specifically handling [KEY CONSTRAINT] through [REQUIRED TECHNIQUE]. Exclusions: [OUT-OF-SCOPE ITEMS].'
+Example: 'Develop a Java 11 concurrent file processor handling 100+ 2GB CSVs/hour using ForkJoinPool, excluding cloud deployment.'"
+write down this goal definition into file docs/goal.md
+```
+
+
+
+p3
+
+```properties
+P3: Threat Modeling & Knowledge Gaps
+Read docs/task.md and docs/goal.md and generate numbered risk/ambiguity pairs:
+[CORE UNCERTAINTY]: [Why it matters] | [If unresolved]
+...
+N. [EDGE CASE]: [Impact analysis] | [Fallback plan]
+Prioritize as BLOCKER/HIGH/MEDIUM. For BLOCKERs, propose 3 clarification questions for the user."
+write down your answer into file docs/risks.md
+create also empty docs/risksAnswers.md where I maybe will provide answers.
+```
+
+
+
+p4
+
+```properties
+P4: Constraint-Driven Strategy
+familiarize yourself to documentaion docs/task.md and docs/goal.md and  docs/risks.md and docs/risks.md and docs/risksAnswers.md
+"Create a solution blueprint answering:
+What 20% of features give 80% value?
+What technical debts are acceptable?
+What can't change post-commit?
+Format:
+CORE: [Irreducible components]
+DEFER: [Phase 2 items]
+AVOID: [Complexity traps]
+Patterns: [Applicable GoF/Concurrency]
+Time Allocation: [Minute-by-minute breakdown]"
+write down your answer into file docs/strategy.md
+```
+
+
+
+P5
+
+```properties
+P5: Atomic Requirements
+familiarize yourself to documentaion docs/task.md and docs/goal.md and  docs/risks.md and docs/risks.md and docs/risksAnswers.md and docs/strategy.md
+"List verifiable specs as:
+F1. [Action] → [Inputs] → [Outputs] (e.g., F1. CSV parse → 2GB file → 100k validated records)
+NF1. [Constraint] → [Metric] (e.g., NF1. Memory → <2GB heap)
+Each must have a direct test mapping. Mark any conflicting requirements with ⚠️."
+write down your answer into file docs/requirements.md
+```
+
+
+
+P6
+
+```properties
+P6: Anti-Pattern Safeguards
+familiarize yourself to documentaion docs/task.md and docs/goal.md and  docs/risks.md and docs/risks.md and docs/risksAnswers.md and docs/strategy.md and docs/requirements.md
+"Design firewall against:
+[Common pitfall 1]: [Detection method] → [Prevention]
+[Code smell 2]: [Smell test] → [Refactor path]
+Example:
+'Lava Flow Anti-Pattern: Scan for unused methods → Implement feature flags'
+Include concurrency model justification and error handling hierarchy."
+write down your answer into file docs/cautions.md
+```
+
+
+
+
+
+P7
+
+```properties
+P7: Component Blueprint
+familiarize yourself to documentaion docs/task.md and docs/goal.md and  docs/risks.md and docs/risks.md and docs/risksAnswers.md and docs/strategy.md and docs/requirements.md and docs/cautions.md
+"Define modules as:
+C1 ([Role]):
+Does: [Primary responsibility]
+Exposes: [Public methods]
+Hides: [Encapsulated logic]
+Talks to: [Dependencies]
+Component graph must show ≤3 layers. Mark any 'god components' for decomposition.
+write down your answer into file docs/proposedArchitecture.md
+```
+
+
+
+P8  teraz tylko coder 
+
+```properties
+start implementing docs/task.md having in mind human time constraint defined in docs/task.md under "timebox" section. if in docs/task.md is "assumption" section follow it sctrictly.
+iterativelly implement main functionality.
+familiarize yourself to documentaion docs/task.md and docs/goal.md and  docs/risks.md and docs/risks.md and docs/risksAnswers.md and docs/strategy.md and docs/requirements.md and docs/cautions.md and docs/proposedArchitecture.md
+
+
+if some feature is taking to much attemps, change approach, simplify. Imagine more iteration on same is more pain, you should scream from pain at third iteraton of code-compile error, max 4 iterations are allowed than you HAVE TO change approach dramatically. 
+
+sub-Prompt: Happy-Path Contracts
+docs/proposedArchitecture.md
+Asses if its cleaner to stay within this class that is in task.md and instead of writing different components just add comment that will mock component // Component1 and so on
+If you will decide to create more class here is some guideline:
+"Produce class skeletons with:
+Final class names/method signatures
+Input preconditions (e.g., @NonNull)
+Success output postconditions
+Example:
+public class FileBatcher {
+public List<Chunk> partition(File f, int lines) throws InvalidFormatException { ... }
+}
+Include mocking points for external systems with // MOCKABLE comments."
+this time answer is not another md file but write code. junits should pass
+
+sub-prompt: Test-Led Implementation
+if task.md requires TDD approach follow:
+"For requirement F[X]:
+Write failing test (JUnit5 + Mockito)
+Add minimal code to pass
+Check cyclomatic complexity (<5)
+If stuck >5min, trigger fallback:
+a. Alternative approach options
+b. Complexity/Time tradeoff analysis
+c. User escalation request
+Repeat until all F[X]/NF[X] covered."
+
+sub-prompt: Complexity Triage
+"Execute:
+Run Jacoco → flag untested complex methods
+Refactor ONLY:
+High-risk complexity (≥7 CC)
+False-positive prone code
+Non-breaking naming issues
+```
+

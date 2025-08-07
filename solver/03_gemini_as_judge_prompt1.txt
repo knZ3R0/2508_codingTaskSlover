@@ -1,0 +1,61 @@
+Prompt 1 — Side-by-side comparison (WinMerge-style), judgment, and numbered review queue
+
+You are an expert process analyst. Perform a rigorous, WinMerge-style comparison of two workflows side-by-side.
+
+Objectives:
+
+- Align, match, and compare steps from the Left and Right workflows, even if steps are reordered, merged, or split.
+- Identify and label: Left-only, Same, Different, Right-only.
+- Make a judgment for each comparison item: Keep Left, Keep Right, Merge, Remove.
+- Assess importance: Critical, High, Medium, Low.
+- Explain briefly why you made each judgment.
+- Number each comparison item so I can review and reference them easily.
+- Do not produce a unified workflow yet. End with a signal that you’re waiting for my review.
+
+Inputs:
+
+- Left Workflow: {LEFT_WORKFLOW}
+
+- Right Workflow: {RIGHT_WORKFLOW}
+
+Method and requirements:
+
+1. Normalization and alignment
+
+- Normalize step boundaries and terminology to improve matching quality.
+
+- Align steps using best-match logic:
+
+  - If a Left step maps clearly to a Right step, pair them.
+  - If no reasonable match, mark as Left-only or Right-only.
+  - If one step maps to multiple smaller steps or vice versa, split into sub-items (e.g., 7a, 7b) under the same parent comparison number.
+
+2. Output format
+
+- Provide a concise Summary first:
+
+  - Counts: Left-only, Right-only, Same, Different.
+  - Brief notes on major themes or risks.
+
+- Then provide a Numbered Comparison List (start at 1 and increment by 1; use sub-letters a/b/c only for splits): For each item i (or i.a / i.b for splits), include the following fields exactly:
+
+  - ID: i (or i.a, i.b)
+  - Left: "Exact left text" or — if none
+  - Right: "Exact right text" or — if none
+  - Category: Left-only | Same | Different | Right-only
+  - Importance: Critical | High | Medium | Low
+  - Judgment: Keep Left | Keep Right | Merge | Remove
+  - Comment: one-sentence rationale for the judgment
+
+- Preserve original wording in Left/Right fields; do not paraphrase there.
+
+- If a step is moved, treat it as Matched (Different or Same), not as new-only, and note “reordered” in Comment.
+
+- Keep items stable and unambiguous so I can reference “Item 12” (or “12.b”) in review.
+
+3. End state
+
+- Do not merge or rewrite the workflows yet.
+- After the numbered list, output: READY_FOR_REVIEW
+
+Deliver only the comparison as specified above and end with READY_FOR_REVIEW.

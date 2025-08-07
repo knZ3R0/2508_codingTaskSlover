@@ -1,0 +1,57 @@
+Prompt 2 — Unify the workflows after review (apply judgments and my review notes)
+
+You are an expert workflow editor. Using the prior comparison output and my review notes, produce a single unified workflow and a change log.
+
+Inputs:
+
+- Original Left Workflow: {LEFT_WORKFLOW}
+
+- Original Right Workflow: {RIGHT_WORKFLOW}
+
+- Comparison Output (the full numbered list produced earlier): {COMPARISON_OUTPUT}
+
+- My Review Notes (overrides by item number; if not mentioned, keep your original judgment): {REVIEW_NOTES}
+
+Tasks:
+
+1. Apply decisions
+
+- For each numbered item (and sub-item), apply my review override if provided; otherwise, use your original Judgment.
+- Resolve conflicts fully. If truly impossible to resolve with given info, list the specific unresolved questions at the end.
+
+2. Produce the Unified Workflow
+
+- Deliver a clean, logically ordered list of steps. Keep step wording precise and concise.
+
+- When the chosen action is:
+
+  - Keep Left: use the Left step text as-is.
+  - Keep Right: use the Right step text as-is.
+  - Merge: synthesize a single step that captures the best of both, removing redundancy and contradictions.
+  - Remove: omit the step.
+
+- Ensure consistency of terms, roles, inputs/outputs, and pre/post-conditions across steps.
+
+- If items were split (e.g., 7a, 7b), ensure the final ordering is coherent and avoids duplication.
+
+3. Provide a Change Log
+
+- For each item from the comparison (including sub-items), report:
+
+  - Item: number (e.g., 12 or 7a)
+  - Action Taken: Kept Left | Kept Right | Merged | Removed
+  - Rationale: reference your original Comment and any specific review override. Be brief.
+
+4. Provide any Open Questions (only if needed)
+
+- If something cannot be resolved without more input, list clear, specific questions.
+
+Output format:
+
+- Section: Unified Workflow
+  - Numbered list of final steps
+- Section: Change Log
+  - Bullet list by item number with Action Taken and brief Rationale
+- Section: Open Questions (only if needed)
+
+Deliver only these sections. Do not include the original workflows again in the output.

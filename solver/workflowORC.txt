@@ -1,0 +1,55 @@
+# P1 — Image Analysis and Text Extraction (Vision GUI)
+
+You are in strict OCR + extraction mode.
+
+Prompt
+
+1. Task:
+   1. Analyze the provided coding task image(s) with OCR and return exact technical text and structure.
+
+2. Output format (deliver as a single fenced code block with language tag `text`, with sections in this exact order):
+   1. Section: 1. extracted_text_lines
+      1) For each line: 
+         1) raw_text 
+         2) confidence_percent (integer 0–100)
+         3) uncertain_chars (list of 0-based indices of characters flagged with [??])
+   2. Section: 2. code_snippets
+      1) Each snippet:
+         1) language_guess
+         2) fenced code (monospace), preserved whitespace, no line numbers
+         3) per-line confidence (integer 0–100 per line)
+   3. Section: 3. requirements
+      1) Numbered items quoted verbatim from the image (exact substrings of the OCR text)
+   4. Section: 4. constraints
+      1) Numbered items quoted verbatim from the image (exact substrings of the OCR text)
+   5. Section: 5. diagrams
+      1) For each diagram element, describe shape, text labels, connectors, direction, and semantics not capturable as plain text
+   6. Section: 6. metadata
+      1) page_count (if multipage)
+      2) image_resolution
+      3) language_guess
+      4) skew_correction_applied (boolean)
+   7. Section: sanity_checks
+      1) Confirm:
+         1) counts of lines match
+         2) total code blocks detected
+         3) no hallucinated content added
+
+3. OCR rules:
+   1. Preserve characters exactly. Do not normalize quotes, dashes, or spacing. The only allowed changes are formatting-only (e.g., markdown fences).
+   2. Mark uncertain characters by appending [??] immediately after the character.
+   3. Provide a confidence integer (0–100) for each output line.
+   4. For code blocks, maintain indentation and tabs; do not add line numbers.
+   5. Use numbered lists only (1. 2. 3.), never bullets or dashes, for list outputs in the OCR result.
+
+4. Quality controls:
+   1. If any token seems ambiguous, add a sibling note line in extracted_text_lines: 
+      1) “note: potential ambiguity at positions [i,j] in line N”
+   2. If diagrams exist, include a “diagram_to_text_loss” numbered list summarizing what cannot be captured in text under the diagrams section.
+   3. End with the “sanity_checks” section confirming:
+      1) line counts
+      2) total code blocks detected
+      3) no hallucinated content
+
+5. Delivery:
+   1. Output a single fenced code block with language tag `text` containing Sections 1–6 and sanity_checks in the exact order above.

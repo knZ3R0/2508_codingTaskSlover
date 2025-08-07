@@ -1,3 +1,8 @@
+i21> ta wersja powstała z odpalenia `03_askGpt5.py` z zawartoscia `F:\git\gh\gh_1001010101010111101010_2508_codingTaskSlover\2508_codingTaskSlover\arch\solver\00_Task.txt` wewnatrz F:\git\gh\gh_1001010101010111101010_2508_codingTaskSlover\2508_codingTaskSlover\03_in.txt
+
+---------------------------------
+
+
 Below is an optimized, end-to-end, single-pass workflow with tightened prompts P1–P8. I’ve made each prompt precise, machine-parsable, idempotent, and designed for automation (one agentic go). For each step I also explain why the revision is better. At the end, I include a contrarian review to challenge the approach.
 
 High-level orchestration notes

@@ -1,3 +1,7 @@
+i21> ta wersja polwstala z odpalenia gtp5 w cline
+
+---------------------------------
+
 Optimized agentic workflow prompts (P1–P8) for a single uninterrupted execution
 
 Controller meta-prompt (for the orchestrator agent to run P2–P8 once, in order)

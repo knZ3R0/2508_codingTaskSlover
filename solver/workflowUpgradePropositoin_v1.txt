@@ -1,0 +1,286 @@
+Below is an optimized, end-to-end, single-pass workflow with tightened prompts P1–P8. I’ve made each prompt precise, machine-parsable, idempotent, and designed for automation (one agentic go). For each step I also explain why the revision is better. At the end, I include a contrarian review to challenge the approach.
+
+High-level orchestration notes
+1. Single-pass flow: P1 (vision-only via ChatGPT GUI) → P2 → P3 → P4 → P5 → P6 → P7 → P8.
+2. Filesystem contract:
+   - If the agent can write files: write exactly to the paths specified.
+   - If not, output each file as a single fenced code block starting with a header line: FILE: <relative/path>.
+3. Re-entrancy: Every step must be deterministic and safe to rerun. Steps re-read docs/*.md, reconcile with existing files, and do minimal changes.
+4. Blocking logic: If P3 produces BLOCKERs and docs/risksAnswers.md is empty, P4–P8 proceed with clearly labeled Assumptions and low-regret defaults; all such assumptions are recorded inline in their files.
+
+Adjusted prompts and workflow
+
+P1 (GPT-4o) — Image Analysis & Text Extraction (Vision)
+Prompt
+You are in strict OCR + extraction mode.
+
+Task:
+1) Perform OCR on the provided image(s) of a coding task. Preserve character-level fidelity exactly. Do not infer corrections. Mark uncertain characters by wrapping them with [??] exactly and assign a confidence % per line.
+2) Extract verbatim items into categories: code snippets, requirements, constraints. These must be direct substrings of the raw OCR text.
+3) Note any diagram/visual elements that do not translate to text (e.g., arrows, boxes, swimlanes).
+4) Output a single fenced code block with the following sections in order:
+   - SECTION: raw_ocr_lines
+     - One line per OCR line, exact characters, no normalization.
+   - SECTION: meta
+     - For each line: index, confidencePercent (0–100), uncertainCharacterSpans (list of [start,end] indices within the line for [??]-wrapped characters).
+   - SECTION: extracted_items
+     - requirements: list of objects {text, sourceLineIndices}
+     - constraints: list of objects {text, sourceLineIndices}
+     - codeSnippets: list of objects {text, sourceLineIndices}
+     All text values must be exact substrings from raw_ocr_lines.
+   - SECTION: diagram_notes
+     - Numbered list of non-textual/structural elements observed.
+   - SECTION: normalized_numbered_text
+     - Present the non-code textual content as a numbered list (1., 2., 3., …) without altering the actual text content (only add numbering). For code, include in code blocks without line numbers.
+
+Rules:
+- Do not add bold/italics or extra decoration.
+- Do not change any characters in raw_ocr_lines.
+- If bullets/dashes are used in the image text, do not change them in raw_ocr_lines; normalized_numbered_text may prefix numbering but must not alter the underlying words.
+- Use a single fenced code block with language tag text.
+
+Why this is better
+1) Separation of concerns: Raw OCR stays pristine; normalized view is clearly separate to avoid accidental mutations.
+2) Machine-parsable: Clear sections enable downstream automation to reliably consume outputs.
+3) Ambiguity capture: Confidence + [??] spans make uncertainty explicit for later risk analysis.
+4) Diagram awareness: Non-text elements are captured so they can be translated into requirements/architecture later.
+
+P2 — Surgical Goal Definition
+Prompt
+Read docs/task.md. Produce a single-sentence, hyper-specific implementation target using this exact template:
+
+Develop [EXACT WHAT] that must [CRITICAL FUNCTION] within [TIMEBOX], specifically handling [KEY CONSTRAINT] through [REQUIRED TECHNIQUE]. Exclusions: [OUT-OF-SCOPE ITEMS].
+
+Constraints:
+1) Use only concrete nouns/verbs. No vague adjectives (robust, scalable, etc.).
+2) Include the TIMEBOX from docs/task.md (timebox section). If absent, assume a conservative default and mark it as an assumption inside the file.
+3) Length ≤ 220 characters. If longer, tighten phrasing without losing specificity.
+4) Output:
+   - If filesystem is writable: write to docs/goal.md (overwrite).
+   - Else: emit as a single fenced code block starting with: FILE: docs/goal.md
+
+Why this is better
+1) Eliminates ambiguity by forcing a compact, testable sentence.
+2) Enforces timebox binding directly from the source.
+3) Keeps content short for easy reuse in later steps.
+
+P3 — Threat Modeling & Knowledge Gaps
+Prompt
+Read docs/task.md and docs/goal.md. Generate numbered risk/ambiguity pairs in this format:
+
+[TITLE]: [Why it matters] | [If unresolved]
+Priority: [BLOCKER|HIGH|MEDIUM]
+If BLOCKER: Questions:
+1) ...
+2) ...
+3) ...
+Fallback assumption (if no answer by next step): ...
+
+Include at least:
+- Core uncertainties (requirements, data, interfaces)
+- Technical risks (performance, tooling, environment)
+- Edge cases (inputs, concurrency, failure modes)
+
+Then:
+1) Write your analysis to docs/risks.md (overwrite).
+2) If docs/risksAnswers.md does not exist, create an empty file docs/risksAnswers.md.
+3) If docs/risksAnswers.md exists and contains any answers, mark corresponding risks as Resolved and update their priority accordingly.
+
+If no filesystem: emit both files as separate fenced code blocks with FILE: headers.
+
+Why this is better
+1) Enforces a consistent, scannable format with explicit fallbacks.
+2) Links Q&A loop via risksAnswers.md to lower rework later.
+3) Uses prioritization that later steps can act on.
+
+P4 — Constraint-Driven Strategy
+Prompt
+Read docs/task.md, docs/goal.md, docs/risks.md, docs/risksAnswers.md. Create a solution blueprint answering:
+
+1) What 20% of features deliver 80% of the value?
+2) What technical debts are acceptable in the timebox (and why)?
+3) What cannot change post-commit (interface contracts, formats, SLAs)?
+4) Patterns: Applicable design/concurrency patterns (only if directly justified).
+5) Time Allocation: Break down the timebox into major buckets (e.g., Spec, TDD, Impl, Tests, Polish). The sum must equal the timebox. If the timebox is unknown, state your assumed timebox and why.
+6) Assumptions activated due to unresolved BLOCKERs from risks.md (cite IDs). Each assumption must be minimal and low-regret.
+
+Output:
+- Write to docs/strategy.md (overwrite). If FS unavailable, emit as a single fenced code block with FILE: docs/strategy.md.
+
+Why this is better
+1) Prioritizes outcomes via 80/20 lens to maximize value under timebox.
+2) Time breakdown ties plan to reality and prevents over-planning.
+3) Immutable post-commit items reduce churn.
+
+P5 — Atomic Requirements
+Prompt
+Read docs/task.md, docs/goal.md, docs/risks.md, docs/risksAnswers.md, docs/strategy.md. List verifiable requirements:
+
+Functional:
+F1. [Action] → [Inputs] → [Outputs] → [Primary success criteria]
+F2. ...
+Non-Functional:
+NF1. [Constraint] → [Metric/Threshold] → [Measurement method]
+NF2. ...
+
+For each F/NF, add a direct test mapping: Test: Txx (human-readable test name).
+Mark conflicts with ⚠️ and cite the conflicting IDs.
+
+Output:
+- Write to docs/requirements.md (overwrite). If FS unavailable, emit FILE: docs/requirements.md.
+
+Why this is better
+1) Every requirement is testable and tied to a concrete test.
+2) Conflicts are explicitly flagged early, not discovered during coding.
+
+P6 — Anti-Pattern Safeguards
+Prompt
+Read docs/task.md, docs/goal.md, docs/risks.md, docs/risksAnswers.md, docs/strategy.md, docs/requirements.md. Design a guardrail plan:
+
+1) Anti-pattern defenses:
+   - [Common pitfall]: [Detection method] → [Prevention/Refactor path]
+   - At least 5 entries targeting known risks from docs/risks.md.
+2) Concurrency model justification (or “No concurrency” with justification). Include data-sharing policy, synchronization strategy, and back-pressure/queueing approach if applicable.        
+3) Error handling hierarchy:
+   - Error classes or categories
+   - When to fail fast vs. degrade gracefully
+   - Logging policy and observability hooks
+
+Output:
+- Write to docs/cautions.md (overwrite). If FS unavailable, emit FILE: docs/cautions.md.
+
+Why this is better
+1) Converts vague caution into actionable detection/prevention.
+2) Forces a conscious concurrency and error-handling stance.
+
+P7 — Component Blueprint
+Prompt
+Read docs/task.md, docs/goal.md, docs/risks.md, docs/risksAnswers.md, docs/strategy.md, docs/requirements.md, docs/cautions.md. Define components:
+
+For each:
+C1 ([Role]):
+- Does: [Primary responsibility]
+- Exposes: [Public methods/signatures or CLI contracts]
+- Hides: [Encapsulated logic/state]
+- Talks to: [Dependencies]
+- Mock points: [Interfaces or seams] // MOCKABLE
+
+Component graph:
+- Layers: ≤ 3 total
+- Show adjacency as lists: Layer 1: [C1, C2], Layer 2: [C3], Layer 3: [C4]
+- Identify any “god components” and propose decomposition if needed.
+
+Output:
+- Write to docs/proposedArchitecture.md (overwrite). If FS unavailable, emit FILE: docs/proposedArchitecture.md.
+
+Why this is better
+1) Enforces layering discipline and mocks by design.
+2) Keeps public surface clear and test-friendly.
+
+P8 — Implementation (Coder, TDD, timebox-aware)
+Prompt
+You are now the coder. Implement the task defined in docs/task.md, guided by docs/goal.md, docs/risks.md, docs/risksAnswers.md, docs/strategy.md, docs/requirements.md, docs/cautions.md, docs/proposedArchitecture.md.
+
+Rules:
+1) Timebox: Adhere strictly to the “timebox” from docs/task.md. If it is absent, use the assumed timebox from docs/strategy.md and proceed.
+2) Happy-Path Contracts:
+   - Re-assess docs/proposedArchitecture.md:
+     a) If task.md specifies work within a single class, prefer staying within that class and use inline comments to represent components (e.g., // Component1: ...).
+     b) Only create multiple classes if it clearly lowers complexity and follows the architecture.
+   - When creating classes, include:
+     - Final class names and method signatures
+     - Input preconditions (e.g., @NonNull or equivalent)
+     - Success postconditions
+     - // MOCKABLE tags for external interactions
+3) Test-Led Implementation (if task.md requires TDD, follow strictly):
+   - For each F[X]:
+     a) Write a failing test (JUnit5 + Mockito or the stack required by task.md)
+     b) Implement minimal code to pass
+     c) Keep cyclomatic complexity < 5 per method (refactor otherwise)
+     d) If stuck > 5 minutes:
+        i) Provide 2–3 alternative approaches
+        ii) State complexity/time trade-offs
+        iii) Escalate with a concise question in a comment (and proceed with lowest-risk assumption)
+   - Cover NF[X] via measurable tests or tooling (benchmarks, limits, lint rules).
+4) Complexity Triage:
+   - Run coverage (e.g., Jacoco) and flag untested complex methods (CC ≥ 7)
+   - Refactor only high-risk complexity and false-positive-prone code
+   - Avoid gold-plating or unnecessary renaming
+5) Iteration Pivot Rule:
+   - If you hit 3 consecutive code-compile errors on the same feature, pivot approach. After 4 total iterations, drastically simplify or change direction.
+6) Build/Test:
+   - Use the build tool and language from docs/task.md (Maven/Gradle/npm/etc.).
+   - If not specified, choose a reasonable default based on language in task.md and state your assumption in a top-level comment.
+7) Output:
+   - Write code and tests to the correct project structure.
+   - Ensure tests pass.
+   - If filesystem is unavailable, emit all files as multiple fenced code blocks each starting with: FILE: <path>, followed by file content.
+
+Why this is better
+1) Explicitly encodes the pivot rule to avoid endless churn.
+2) Enforces measurable outcomes and coverage on the riskiest code.
+3) Keeps implementation aligned to earlier decisions while allowing pragmatic simplification.
+
+Additional orchestration helpers (optional but recommended)
+- P0 (optional bootstrap): Create docs/ if missing. If FS unavailable, switch to FILE: blocks.
+- Consistency check after P5 and P7: A quick lint that the requirements map to components and tests (can be folded into P7).
+
+Contrarian / negative-thinking review (where this could fail and what you might need to provide)
+
+1) OCR fidelity vs. normalization conflict
+   - Risk: P1 demands exact OCR while adding numbering in normalized text. A careless agent might “fix” typos or alter content.
+   - Mitigation: Strict separation of raw_ocr_lines (immutable) and normalized_numbered_text (adds only numbering). You should verify P1’s raw vs. normalized section on the first run.       
+
+2) Missing or vague timebox
+   - Risk: Many steps depend on timebox. If docs/task.md lacks it, the plan relies on assumptions.
+   - Mitigation: Provide a clear timebox in docs/task.md. If not, P4 will state an assumed timebox; confirm or override early.
+
+3) Unresolved BLOCKERs in risks
+   - Risk: Proceeding with assumptions can misalign implementation.
+   - Mitigation: Fill docs/risksAnswers.md promptly with authoritative answers. If you cannot, confirm the fallback assumptions P3/P4 wrote.
+
+4) Language/build ambiguity
+   - Risk: P8 may guess language/build system incorrectly if task.md is not explicit.
+   - Mitigation: Specify language, minimum version, test framework, and build tool in docs/task.md. If missing, the agent will choose defaults and note assumptions.
+
+5) File system and tool limits
+   - Risk: Agents without file write access or build tooling cannot create files or run tests.
+   - Mitigation: The FILE: <path> emission format covers no-FS scenarios; you’ll need to copy files locally and run tests yourself.
+
+6) Over-prescription for small tasks
+   - Risk: The full spec/risks/architecture process could be heavy for a trivial task, reducing velocity.
+   - Mitigation: The prompts encourage 80/20 and minimalism. If task.md scope is tiny, the agent should produce short, proportional outputs.
+
+7) Coverage/complexity metrics availability
+   - Risk: Jacoco or similar tools might not be available in the environment.
+   - Mitigation: P8 falls back to reporting intended coverage and CC; you may need to run locally. You can pre-configure build scripts in the repo to ensure they exist.
+
+8) Vision limitations
+   - Risk: P1 might miss characters for low-contrast or rotated text; [??] flags might proliferate.
+   - Mitigation: Provide the clearest possible image. If critical parts are unreadable, add a companion text version in docs/task.md.
+
+9) Diagram semantics loss
+   - Risk: Complex diagram logic isn’t fully captured by textual notes.
+   - Mitigation: Provide a textual explanation in docs/task.md or allow the agent to propose a diagram-to-text translation (e.g., sequence steps) for your approval.
+
+10) Strict single-sentence goal could exclude nuance
+   - Risk: P2’s brevity might exclude secondary objectives.
+   - Mitigation: The nuance is captured in P3–P7; P2 is for the north-star statement only.
+
+11) Pivot rule could halt progress prematurely
+   - Risk: A challenging feature might need more than four iterations.
+   - Mitigation: The prompt suggests drastic simplification rather than stopping entirely—still progress, just with reduced scope.
+
+12) Architecture constraint of ≤3 layers
+   - Risk: Some systems need more depth.
+   - Mitigation: This is a default guardrail for simplicity. If task.md mandates more, the agent should justify an exception in P7.
+
+13) Ambiguous “single class” mandate
+   - Risk: P8’s “single class if task.md says so” might compress design too much.
+   - Mitigation: P8 includes a re-assessment clause; it can still factor out helpers when it reduces complexity without violating constraints.
+
+14) Non-determinism in model outputs
+   - Risk: Slight phrasing differences could cause format drift.
+   - Mitigation: Each prompt demands a single fenced code block, defined sections, and FILE: headers where needed to help downstream parsing.
+
+If you share docs/task.md and any initial image(s), I can tailor these prompts to your exact stack and constraints (language, build tool, CI, expected artifacts) and pre-populate assumptions to reduce risk before you run the pipeline.

@@ -1,0 +1,247 @@
+Optimized agentic workflow prompts (P1–P8) for a single uninterrupted execution
+
+Controller meta-prompt (for the orchestrator agent to run P2–P8 once, in order)
+1. Objective: Execute P2–P8 sequentially, exactly once each, writing outputs to the specified files. Abort early with a clear diagnostic if an upstream dependency is missing (for example docs/task.md) and emit a remediation checklist.
+2. Guardrails:
+   1. Idempotency: If an output file already exists, back it up once with suffix .bak before overwriting (for example docs/goal.md → docs/goal.md.bak). Always write full files, not fragments.
+   2. Determinism: Use only content derived from repository files and P1 outputs. Do not hallucinate requirements.
+   3. Traceability: At the bottom of each produced file, append a short “Provenance” section listing input files and checks performed.
+   4. Fail-fast: If any step cannot meet acceptance checks, stop and write docs/_run_failed.md including the failing step, reason, and required user action.
+3. Inputs: docs/task.md is the canonical source. Where referenced files are absent, ask only once by writing docs/risksAnswers.md placeholders with explicit questions, then proceed marking BLOCKER risks.
+4. Timebox awareness: If docs/task.md defines a timebox, enforce it in P4 and P8 (for example allocate no more than 60 percent to coding, 20 percent to tests, 20 percent to refactors), and in P8 stop after reaching the iteration limit, writing a fallback plan.
+5. Stack alignment: If docs/task.md specifies a stack, follow it. Otherwise default to Java 17, Maven, JUnit 5, Mockito, JaCoCo. When non-Java, map to equivalents (for example Python: pytest, coverage; Node: Jest, nyc).
+
+
+
+P1 — Image Analysis and Text Extraction (only step run via ChatGPT GUI with vision)
+
+Prompt
+1. Task: Analyze the provided coding task image with OCR and return exact technical text and structure.
+2. Output format:
+   1. Section: 1. extracted_text_lines. For each line: 1) raw_text, 2) confidence_percent integer 0–100, 3) uncertain_chars list of 0-based indexes flagged with [??].
+   2. Section: 2. code_snippets. Each with language guess, fenced code (monospace), preserved whitespace, no line numbers, and per-line confidence.
+   3. Section: 3. requirements. As numbered items quoted verbatim from the image.
+   4. Section: 4. constraints. As numbered items quoted verbatim.
+   5. Section: 5. diagrams. For each diagram element, describe shape, text labels, connectors, direction, and semantics that cannot be textually captured.
+   6. Section: 6. metadata. Include page_count if multipage, image_resolution, language_guess, skew_correction_applied boolean.
+3. OCR rules:
+   1. Preserve characters exactly. Do not normalize quotes, dashes, or spacing. The only allowed changes are formatting-only (for example markdown fences).
+   2. Flag any uncertain character using [??] immediately after the character.
+   3. Provide confidence for each output line as an integer 0–100.
+   4. For code blocks, maintain indentation and tabs. Do not add line numbers.
+   5. Numbered lists only (1. 2. 3.), never bullets or dashes.
+4. Quality controls:
+   1. If a token seems ambiguous, add a sibling note line: “1. note: potential ambiguity at positions [i,j] in line N”.
+   2. If diagrams exist, include a “diagram_to_text_loss” numbered list summarizing what cannot be captured in text.
+   3. End with a “sanity_checks” section confirming that 1) counts of lines match, 2) total code blocks detected, 3) no hallucinated content added.
+
+Why this is better
+1. It enforces a deterministic, parse-friendly structure so downstream P2–P8 can consume the output.
+2. It preserves exactness while still providing uncertainty markers and confidence, improving reviewability.
+3. It collects diagram semantics upfront to reduce missing requirements.
+4. It prevents list-style drift by forcing numbered lists, harmonizing with subsequent steps.
+
+
+
+P2 — Surgical Goal Definition
+
+Prompt
+1. Inputs: docs/task.md is mandatory. If missing, stop and write docs/_run_failed.md: “P2 missing docs/task.md”.
+2. Read docs/task.md. Extract explicitly stated 1) deliverable, 2) critical function, 3) timebox, 4) key constraints, 5) exclusions. If any are absent, infer from context conservatively and mark as assumed.
+3. Produce a single-line goal in this exact template:
+   1. Develop [EXACT WHAT] that must [CRITICAL FUNCTION] within [TIMEBOX], specifically handling [KEY CONSTRAINT] through [REQUIRED TECHNIQUE]. Exclusions: [OUT-OF-SCOPE ITEMS].
+4. Also append a short rationale explaining why the chosen REQUIRED TECHNIQUE is the best fit given constraints.
+5. Write the result to docs/goal.md with sections:
+   1. 1. goal (single line as specified)
+   2. 2. rationale
+   3. 3. provenance (list inputs checked and any assumptions)
+
+Why this is better
+1. Enforces a single-line target for maximum alignment and minimal ambiguity.
+2. Captures rationale to justify the chosen technique early, limiting churn later.
+3. Adds provenance so reviewers can trace assumptions back to docs/task.md.
+
+
+
+P3 — Threat Modeling and Knowledge Gaps
+
+Prompt
+1. Inputs: docs/task.md and docs/goal.md. If docs/goal.md missing, stop and write docs/_run_failed.md: “P3 missing docs/goal.md”.
+2. Generate numbered risk and ambiguity pairs with the format:
+   1. [TITLE]: [Why it matters] | [If unresolved]
+   2. Priority: BLOCKER/HIGH/MEDIUM
+   3. For BLOCKERs only: add 3 numbered clarification questions for the user.
+3. Include an “Edge Cases” section listing at least 5 non-happy-path scenarios.
+4. Write to docs/risks.md. Create an empty docs/risksAnswers.md pre-populated with numbered placeholders:
+   1. Q1: …
+   2. A1:
+   3. Q2: …
+   4. A2:
+   5. … covering all BLOCKER questions.
+
+Why this is better
+1. Uses a strict schema that ties risk to consequence and action.
+2. Separates BLOCKERs with explicit questions to drive resolution.
+3. Prepares a fill-in file for fast stakeholder response without rerunning analysis.
+
+
+
+P4 — Constraint-Driven Strategy
+
+Prompt
+1. Inputs: docs/task.md, docs/goal.md, docs/risks.md, docs/risksAnswers.md.
+2. Create a solution blueprint answering:
+   1. CORE: Irreducible components that unlock 80 percent of value.
+   2. DEFER: Phase 2 items safe to postpone.
+   3. AVOID: Complexity traps, premature optimizations.
+   4. Patterns: Applicable design patterns (for example Strategy, Template Method, Producer-Consumer). Justify each in one sentence.
+   5. Time Allocation: Minute-by-minute breakdown honoring the timebox in docs/task.md. Include buffers (for example 15 percent).
+3. Integrate answers from docs/risksAnswers.md; if unanswered, keep the risk in scope with mitigation notes.
+4. Write to docs/strategy.md, ending with a “Plan Check” listing:
+   1. 1. aligns_with_goal yes/no
+   2. 2. respects_timebox yes/no
+   3. 3. unresolved_blockers count
+
+Why this is better
+1. Focuses on leverage: 20 percent that yields 80 percent outcome.
+2. Encodes pattern choices and timing so P8 implementation can proceed predictably.
+3. Makes alignment checks explicit to catch drift before coding.
+
+
+
+P5 — Atomic Requirements
+
+Prompt
+1. Inputs: docs/task.md, docs/goal.md, docs/risks.md, docs/risksAnswers.md, docs/strategy.md.
+2. Produce verifiable specs:
+   1. Functional: F1. [Action] → [Inputs] → [Outputs]. Each maps to an explicit test name.
+   2. Non-Functional: NF1. [Constraint] → [Metric] and acceptance thresholds.
+3. Mark conflicting requirements with the prefix “WARNING-CONFLICT”. Add a short note for reconciliation.
+4. Append a “Test Mapping” section listing, for each F/NF, the exact test class and method that will validate it (or equivalent in the chosen stack).
+5. Write to docs/requirements.md.
+
+Why this is better
+1. Guarantees every requirement is testable by construction.
+2. Surfaces conflicts early with precise test mappings.
+3. Bridges analysis and test names to accelerate TDD in P8.
+
+
+
+P6 — Anti-Pattern Safeguards
+
+Prompt
+1. Inputs: docs/task.md, docs/goal.md, docs/risks.md, docs/risksAnswers.md, docs/strategy.md, docs/requirements.md.
+2. Design a guardrail document listing:
+   1. [Common pitfall]: [Detection] → [Prevention]
+   2. [Code smell]: [Smell test] → [Refactor path]
+3. Include:
+   1. Concurrency model justification (for example single-threaded event loop, fixed thread pool, actor model).
+   2. Error handling hierarchy (for example domain exceptions, retriable transient errors, user-facing messages).
+   3. Observability policy (for example logs, metrics, tracing, sampling).
+   4. Dependency boundaries and MOCKABLE seams.
+4. Write to docs/cautions.md.
+
+Why this is better
+1. Turns vague “avoid pitfalls” into concrete detection and remediation.
+2. Forces concurrency and error handling decisions before coding.
+3. Establishes observability to aid P8 iteration without guesswork.
+
+
+
+P7 — Component Blueprint
+
+Prompt
+1. Inputs: docs/task.md, docs/goal.md, docs/risks.md, docs/risksAnswers.md, docs/strategy.md, docs/requirements.md, docs/cautions.md.
+2. Define modules as:
+   1. C1 ([Role]):
+   2. Does: [Primary responsibility]
+   3. Exposes: [Public methods]
+   4. Hides: [Encapsulated logic]
+   5. Talks to: [Dependencies]
+3. Provide a component graph with no more than 3 layers (for example API → Service → Infra). Mark any potential “god components” with a decomposition note.
+4. Add “Contract Notes” listing preconditions and postconditions for each public method and highlight MOCKABLE points.
+5. Write to docs/proposedArchitecture.md.
+
+Why this is better
+1. Constrains layering to reduce accidental complexity.
+2. Documents contracts so P8 code and tests share the same expectations.
+3. Flags god components early to prevent monolith creep.
+
+
+
+P8 — Iterative Implementation (coder-only execution)
+
+Prompt
+1. Inputs: docs/task.md, docs/goal.md, docs/risks.md, docs/risksAnswers.md, docs/strategy.md, docs/requirements.md, docs/cautions.md, docs/proposedArchitecture.md.
+2. Timebox enforcement: Respect docs/task.md “timebox”. Stop coding when 90 percent of the timebox elapses and finish with tests and docs. If timebox missing, use the P4 Time Allocation.
+3. Happy-Path Contracts:
+   1. When task.md defines a single target class, prefer implementing within it and annotate future components as comments “// ComponentX MOCKABLE seam”.
+   2. If separation improves clarity measurably (for example reduces cyclomatic complexity or adheres to proposedArchitecture), create minimal class skeletons with final class names and method signatures, including:
+      1. Preconditions (for example @NonNull)
+      2. Postconditions
+      3. // MOCKABLE comments for external systems
+4. Test-Led Implementation:
+   1. For each requirement F[X]:
+      1. Write a failing test first (Java default: JUnit 5 + Mockito; adapt to stack if task.md specifies otherwise).
+      2. Add minimal production code to pass.
+      3. Keep cyclomatic complexity under 5. If over, refactor immediately.
+      4. If stuck for more than 5 minutes or after 3 consecutive red-green cycles on the same method, trigger fallback:
+         1. a. Alternative approach options
+         2. b. Complexity and time tradeoff analysis
+         3. c. Document user escalation request into docs/_escalation.md
+   2. Repeat until all F and NF are addressed or the timebox triggers a stop.
+5. Complexity Triage:
+   1. Run coverage (default JaCoCo or stack equivalent). Flag methods with CC ≥ 7 or uncovered branches.
+   2. Refactor only high-risk hotspots and misleading names. Avoid scope creep.
+6. Build and Acceptance:
+   1. Ensure all tests pass.
+   2. Produce a short RELEASE_NOTES.md with implemented F/NF, known gaps, and run instructions.
+7. Iteration cap rule:
+   1. Absolute max 4 iterations per feature. On the third “pain iteration,” pivot approach. On the fourth, stop and document fallback and reason.
+8. Stack defaults and mapping:
+   1. If task.md does not specify a stack, use Java 17, Maven, JUnit 5, Mockito, JaCoCo.
+   2. If task.md specifies a different stack, map:
+      1. Java → Python: JUnit → pytest, Mockito → unittest.mock, JaCoCo → coverage.py
+      2. Java → Node: JUnit → Jest, Mockito → jest.mock, JaCoCo → nyc
+
+Why this is better
+1. Converts TDD and iteration rules into measurable gates and pivot triggers.
+2. Aligns with architecture and contracts to prevent test and code drift.
+3. Balances speed and safety by enforcing timebox and complexity ceilings.
+
+
+
+Contrarian and negative thinking — where this workflow may fail and why
+
+1. Missing canonical task file:
+   1. If docs/task.md is absent or incomplete, P2–P8 will either halt or proceed on assumptions, risking misalignment. Mitigation: Fail fast with docs/_run_failed.md and generate targeted questions in docs/risksAnswers.md.
+2. Over-constrained structure:
+   1. Strict schemas can slow progress when the task is trivial. Mitigation: Allow a “fast-lane” if docs/task.md marks triviality, bypassing P3–P6 for a micro feature.
+3. Stack mismatch:
+   1. P8 defaults to Java/JUnit assumptions. If task.md mandates another ecosystem, mapping may be lossy (for example mocking semantics differ). Mitigation: Enforce a stack check in P4 and record substitutions explicitly.
+4. Timebox realism:
+   1. The timebox in docs/task.md may be too optimistic. The iteration cap may force premature pivoting. Mitigation: Reserve a buffer and prioritize CORE features in P4, settle for smallest viable slice in P8.
+5. OCR fragility in P1:
+   1. Even with confidence scores, subtle glyph errors can corrupt identifiers or APIs. Mitigation: P1 embeds uncertainty markers, but also include a manual review checklist at P2 start if reliance on P1 is high.
+6. Dependency on stakeholder answers:
+   1. Unanswered BLOCKER questions in docs/risksAnswers.md can stall decisive design. Mitigation: Provide conservative defaults and clearly list risks with “If unresolved” consequences in P3 and reflected in P4.
+7. Coverage versus velocity tension:
+   1. Enforcing coverage and low cyclomatic complexity can impede delivery in a tight timebox. Mitigation: Only triage hotspots (CC ≥ 7) and accept technical debt as documented in P4 DEFER.
+8. Architecture rigidity:
+   1. Three-layer cap may not fit certain domains (for example ETL with multiple adapters). Mitigation: Permit exceptions documented in P7 with justification and future decomposition plan.
+9. Idempotency side-effects:
+   1. Backups (.bak) may proliferate and confuse subsequent automation. Mitigation: Limit to a single backup per run and clean on release.
+10. Non-deterministic environments:
+   1. Tooling differences across systems (for example Windows path issues) can break P8 scripts. Mitigation: Abstract commands in task.md or strategy.md with cross-platform alternatives.
+11. Test oracle ambiguity:
+   1. Some NF requirements (for example usability) are hard to encode as automated tests. Mitigation: Convert to measurable proxies (for example response time, error budget) in P5.
+12. Diagram lossiness:
+   1. P1 diagram_to_text_loss may hide critical flow nuances. Mitigation: Force a manual diagram confirmation step when losses are non-trivial before P7/P8.
+13. Overheads for small tasks:
+   1. The full P2–P7 pipeline can be heavy for a 30-minute change. Mitigation: P4 should collapse steps when timebox & scope indicate “micro” and log deviation.
+
+
+
+Notes to implementers
+1. This reply intentionally references docs/task.md and a set of docs/*.md outputs. Ensure these files exist or allow the fail-fast remediations described above.
+2. If you want an even more automated one-shot run, add a thin runner that executes P2–P8 in order, applying the Controller meta-prompt at the top of this file.

@@ -1,0 +1,116 @@
+# Unified Workflow (based on Comparison A judgments and repo constraints)
+
+Controller and Guardrails (applied globally)
+- Idempotency and Backups: Before overwriting any docs/*.md output, create a single .bak backup if none exists (e.g., docs/goal.md → docs/goal.md.bak). Always write full files, not fragments.
+- Determinism: Use only content derived from repository files. Do not hallucinate requirements.
+- Traceability: Append a short “Provenance” section to the bottom of each produced file listing input files, assumptions, and checks performed.
+- Fail-fast: If a step’s mandatory input is missing or acceptance checks fail, stop and write docs/_run_failed.md with: step, reason, remediation checklist.
+- Re-entrancy: Steps re-read docs/*.md on reruns and reconcile deterministically with minimal changes.
+- Filesystem Fallback: If unable to write files, emit each artifact as a single fenced code block beginning with “FILE: <relative/path>”.
+- Canonical Input: docs/task.md is the source of truth. Honor explicit constraints:
+  - No TDD required
+  - No JUnit tests required
+  - No additional classes required
+  - Timebox: 45 minutes total (enforce planning in P4 and coding in P8)
+- Implementation Gating: No code changes (no edits to src/*) before P8; steps P2–P7 produce documentation only. P8 begins only after re-reading docs/*.md and docs/task.md.
+- Local Command Execution Policy: Do not auto-execute local commands. Provide exact commands for the user to run and request they paste terminal output; keep such requests minimal to avoid blocking on terminals.
+
+Note on P1 (Vision/OCR)
+- Skipped in this repository because docs/task.md already contains the task in text form.
+
+## P2 — Surgical Goal Definition
+1. Read docs/task.md.
+2. Produce a single-line target using exactly:
+   Develop [EXACT WHAT] that must [CRITICAL FUNCTION] within [TIMEBOX], specifically handling [KEY CONSTRAINT] through [REQUIRED TECHNIQUE]. Exclusions: [OUT-OF-SCOPE ITEMS].
+   - Constraints: ≤ 220 characters; include the 45-minute timebox; mark any inferred items as assumptions.
+3. Write docs/goal.md with sections:
+   1) 1. goal (the single line)
+   2) 2. rationale (why the REQUIRED TECHNIQUE fits constraints)
+   3) 3. provenance
+
+## P3 — Threat Modeling & Knowledge Gaps
+1. Inputs: docs/task.md, docs/goal.md. If docs/goal.md missing, fail-fast.
+2. Produce docs/risks.md:
+   - For each item:
+     [TITLE]: [Why it matters] | [If unresolved]
+     Priority: BLOCKER/HIGH/MEDIUM
+     If BLOCKER: Questions:
+     1) ...
+     2) ...
+     3) ...
+   - Include an “Edge Cases” section (≥ 5 items).
+3. Create docs/risksAnswers.md if missing (empty shell for answers). If it exists with answers, mark resolved risks and downgrade their priority accordingly.
+4. Append provenance.
+
+## P4 — Constraint-Driven Strategy
+1. Inputs: docs/task.md, docs/goal.md, docs/risks.md, docs/risksAnswers.md. If any critical dependency missing, fail-fast.
+2. Write docs/strategy.md with:
+   - CORE: The minimal 20% of work that delivers 80% of value.
+   - DEFER: Safe-to-postpone items for later.
+   - AVOID: Complexity traps and premature optimizations.
+   - Patterns: Only if directly justified (e.g., Strategy/Template Method/Producer-Consumer).
+   - Time Allocation: Break the 45-minute timebox into buckets (e.g., Spec, Impl, Verification, Polish) with a modest buffer (~15%). Sum must equal 45 minutes.
+   - Integrate any answers from docs/risksAnswers.md; if unanswered, keep risk in scope with mitigation notes.
+   - Plan Check:
+     1) 1. aligns_with_goal yes/no
+     2) 2. respects_timebox yes/no
+     3) 3. unresolved_blockers count
+3. Append provenance.
+
+## P5 — Atomic Requirements
+1. Inputs: docs/task.md, docs/goal.md, docs/risks.md, docs/risksAnswers.md, docs/strategy.md. If any critical dependency missing, fail-fast.
+2. Write docs/requirements.md:
+   - Functional:
+     F1. [Action] → [Inputs] → [Outputs] → [Primary success criteria]
+     F2. ...
+   - Non-Functional:
+     NF1. [Constraint] → [Metric/Threshold] → [Measurement method]
+     NF2. ...
+   - Conflicts: Prefix with “WARNING-CONFLICT” and add a short reconciliation note.
+   - Test Mapping: For each F/NF, list an explicit human-readable test name “Test: Txx ...” (no test classes or JUnit scaffolding required).
+3. Append provenance.
+
+## P6 — Anti-Pattern Safeguards
+1. Inputs: docs/task.md, docs/goal.md, docs/risks.md, docs/risksAnswers.md, docs/strategy.md, docs/requirements.md. If any critical dependency missing, fail-fast.
+2. Write docs/cautions.md including:
+   - Anti-pattern defenses: [Common pitfall] → [Detection] → [Prevention/Refactor path] (≥ 5 entries mapped to known risks).
+   - Concurrency model justification (or “No concurrency”) with data-sharing policy; synchronization/back-pressure if applicable.
+   - Error handling hierarchy: error categories, fail-fast vs graceful degrade, logging policy.
+   - Observability policy: logs/metrics/tracing/sampling appropriate to the scope.
+   - Dependency boundaries and MOCKABLE seams.
+3. Append provenance.
+
+## P7 — Component Blueprint
+1. Inputs: docs/task.md, docs/goal.md, docs/risks.md, docs/risksAnswers.md, docs/strategy.md, docs/requirements.md, docs/cautions.md. If any critical dependency missing, fail-fast.
+2. Write docs/proposedArchitecture.md:
+   - For each component:
+     Cn ([Role]):
+     - Does: [Primary responsibility]
+     - Exposes: [Public methods/contracts]
+     - Hides: [Encapsulated logic]
+     - Talks to: [Dependencies]
+     - Mock points: [Interfaces or seams] // MOCKABLE
+   - Component graph: ≤ 3 layers (e.g., API → Service → Infra). Identify potential “god components” and propose decomposition if needed.
+   - Contract Notes: Preconditions and postconditions for each public method; highlight MOCKABLE points.
+3. Append provenance.
+
+## P8 — Implementation (timebox-aware, no TDD required)
+1. Inputs and Gating: Re-read docs/task.md and all docs/*.md artifacts (P2–P7). Code changes are permitted exclusively in P8. If unresolved BLOCKERs threaten correctness, implement the smallest viable slice and document gaps in RELEASE_NOTES.md.
+2. Timebox Enforcement:
+   - Use P4’s allocation within the 45-minute cap.
+   - Stop coding at ~90% of the timebox; finalize with sanity checks/docs.
+3. Implementation Rules (aligned to Hackerrank-style stub in docs/task.md):
+   - No TDD/JUnit required: Do not create test scaffolding unless explicitly requested.
+   - No additional classes required: Prefer implementing within the provided class/method; only factor minimal helpers if it clearly reduces complexity, and keep within the single-class constraint.
+   - Keep cyclomatic complexity per method < 5; simplify early if exceeded.
+   - When uncertain inputs (e.g., missing period_yr rules vs dataset reality), prefer conservative behavior per docs/task.md and record assumption in code comments.
+4. Build/Run:
+   - make sure to update "main" method so new code is beeing used also remove System.out.println("hello");
+   - Do not auto-execute local commands; the user runs them and shares terminal output (e.g., mvn -q -DskipTests package).
+   - Provide minimal, exact commands only when necessary; avoid long-running/disruptive commands that block waiting for terminal updates.
+   - Use the environment implied by docs/task.md (no Maven/Gradle overhead unless explicitly required).
+   - Ensure the solution compiles and the function signature matches the stub.
+5. Output:
+   - Write code to the correct file(s) per the stub.
+   - Produce a brief RELEASE_NOTES.md listing implemented F/NF, known gaps, assumptions, and run instructions.
+   - Append provenance to RELEASE_NOTES.md.

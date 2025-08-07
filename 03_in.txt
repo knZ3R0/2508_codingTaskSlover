@@ -1,0 +1,14 @@
+What is the capital of France? Also tell me what GPT version you are and your knowledge cutoff date—in one sentence.
+
+Here's some additional context with various quotes:
+- Single quotes: 'Hello world'
+- Double quotes: "This is a test"
+- Mixed quotes: He said "I'm going to the store" and she replied 'That's fine'
+- Escape sequences: "She said \"Hello\" to me"
+- Multi-line content with quotes:
+  ```
+  def example():
+      return "This function returns a string with 'mixed' quotes"
+  ```
+
+Please analyze this content and respond appropriately, handling all the quote variations properly.

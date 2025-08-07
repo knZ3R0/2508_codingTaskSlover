@@ -12,6 +12,8 @@ Controller and Guardrails (applied globally)
   - No JUnit tests required
   - No additional classes required
   - Timebox: 45 minutes total (enforce planning in P4 and coding in P8)
+- Implementation Gating: No code changes (no edits to src/*) before P8; steps P2–P7 produce documentation only. P8 begins only after re-reading docs/*.md and docs/task.md.
+- Local Command Execution Policy: Do not auto-execute local commands. Provide exact commands for the user to run and request they paste terminal output; keep such requests minimal to avoid blocking on terminals.
 
 Note on P1 (Vision/OCR)
 - Skipped in this repository because docs/task.md already contains the task in text form.
@@ -93,7 +95,7 @@ Note on P1 (Vision/OCR)
 3. Append provenance.
 
 ## P8 — Implementation (timebox-aware, no TDD required)
-1. Inputs: All docs/*.md artifacts above. If unresolved BLOCKERs threaten correctness, implement the smallest viable slice and document gaps in RELEASE_NOTES.md.
+1. Inputs and Gating: Re-read docs/task.md and all docs/*.md artifacts (P2–P7). Code changes are permitted exclusively in P8. If unresolved BLOCKERs threaten correctness, implement the smallest viable slice and document gaps in RELEASE_NOTES.md.
 2. Timebox Enforcement:
    - Use P4’s allocation within the 45-minute cap.
    - Stop coding at ~90% of the timebox; finalize with sanity checks/docs.
@@ -103,38 +105,12 @@ Note on P1 (Vision/OCR)
    - Keep cyclomatic complexity per method < 5; simplify early if exceeded.
    - When uncertain inputs (e.g., missing period_yr rules vs dataset reality), prefer conservative behavior per docs/task.md and record assumption in code comments.
 4. Build/Run:
+   - make sure to update "main" method so new code is beeing used also remove System.out.println("hello");
+   - Do not auto-execute local commands; the user runs them and shares terminal output (e.g., mvn -q -DskipTests package).
+   - Provide minimal, exact commands only when necessary; avoid long-running/disruptive commands that block waiting for terminal updates.
    - Use the environment implied by docs/task.md (no Maven/Gradle overhead unless explicitly required).
    - Ensure the solution compiles and the function signature matches the stub.
 5. Output:
    - Write code to the correct file(s) per the stub.
    - Produce a brief RELEASE_NOTES.md listing implemented F/NF, known gaps, assumptions, and run instructions.
    - Append provenance to RELEASE_NOTES.md.
-
----
-
-## Change Log (applied from Comparison A)
-
-- Item 1 — Action: Merged
-  - Rationale: Combine backups/fail-fast/provenance (Left) with re-entrancy and FILE fallback (Right) for robust, deterministic runs.
-- Item 2 — Action: Removed
-  - Rationale: Vision/OCR step unnecessary since docs/task.md is textual in this repo; saves time.
-- Item 3 — Action: Kept Right
-  - Rationale: Enforce concise single-line goal and ≤ 220 chars for clarity and reuse speed.
-- Item 4 — Action: Kept Right
-  - Rationale: Reconciliation on re-runs (mark Resolved) tightens idempotent convergence.
-- Item 5 — Action: Kept Either
-  - Rationale: Both ensure realistic time budgeting; unified step keeps explicit 45-minute allocation with buffer.
-- Item 6 — Action: Kept Right
-  - Rationale: Test mapping via human-readable names avoids forcing test classes or JUnit scaffolding.
-- Item 7 — Action: Kept Either
-  - Rationale: Both provide actionable guardrails; unified on concise anti-pattern safeguards (docs/cautions.md).
-- Item 8 — Action: Kept Right
-  - Rationale: Use docs/proposedArchitecture.md; naming emphasizes proposed design intent.
-- Item 9 — Action: Kept Right
-  - Rationale: TDD made conditional in Right; unified to “no TDD/JUnit required” per docs/task.md to avoid conflict and save time.
-- Item 10 — Action: Kept Either
-  - Rationale: Single-class preference retained per stub requirement.
-- Item 11 — Action: Kept Right
-  - Rationale: Do not impose build tools/coverage; align with Hackerrank-style environment.
-- Item 12 — Action: Merged
-  - Rationale: Maintain per-file provenance consistently to support auditing and re-runs.

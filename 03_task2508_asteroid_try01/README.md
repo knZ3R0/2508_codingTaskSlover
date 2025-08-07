@@ -11,3 +11,7 @@ mvn clean compile
 ```bash
 java -cp target/classes pl.darulec.Result
 ```
+
+```
+using @/solver/workflow.txt  implement agentically @/docs/task.md  in @/src/main/java/pl/darulec/Result.java 
+```
